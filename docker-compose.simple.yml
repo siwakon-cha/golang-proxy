@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  rpc-proxy:
+    image: rpc-proxy:latest  # or your-dockerhub-username/rpc-proxy:latest
+    ports:
+      - "8888:8888"
+    environment:
+      # Server Configuration
+      - SERVER_PORT=8888
+      
+      # Skip database - use environment variables only
+      - DB_HOST=none
+      
+      # Ethereum Mainnet
+      - ETHEREUM_RPC_ENDPOINTS=https://eth.llamarpc.com,https://ethereum.publicnode.com,https://rpc.ankr.com/eth
+      
+      # Sepolia Testnet  
+      - SEPOLIA_RPC_ENDPOINTS=https://sepolia.drpc.org,https://ethereum-sepolia-rpc.publicnode.com,https://rpc.ankr.com/eth_sepolia
+      
+      # Soneium Mainnet
+      - SONEIUM_RPC_ENDPOINTS=https://soneium.drpc.org,https://rpc.soneium.org,https://soneium-mainnet.public.blastapi.io
+      
+      # Health Check Settings
+      - HEALTH_CHECK_INTERVAL=30s
+      - HEALTH_CHECK_TIMEOUT=5s
+      
+      # Proxy Settings
+      - PROXY_TIMEOUT=10s
+      - LOG_LEVEL=info
+      
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8888/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

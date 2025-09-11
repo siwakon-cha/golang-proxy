@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-rpc_proxy}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-rpc_proxy}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rpc-proxy:
+    build: .
+    ports:
+      - "${SERVER_PORT:-8080}:${SERVER_PORT:-8080}"
+    env_file:
+      - .env
+    environment:
+      # Override database host for Docker networking
+      - DB_HOST=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:${SERVER_PORT:-8080}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # IPFS for subgraph storage
+  ipfs:
+    image: ipfs/go-ipfs:latest
+    environment:
+      - IPFS_PROFILE=server
+    ports:
+      - "5001:5001"
+    volumes:
+      - ipfs_data:/data/ipfs
+    command: daemon --migrate=true --agent-version-suffix=docker
+
+  # PostgreSQL for graph-node
+  graph-postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: graph-node
+      POSTGRES_USER: graph-node
+      POSTGRES_PASSWORD: let-me-in
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5433:5432"
+    volumes:
+      - graph_postgres_data:/var/lib/postgresql/data
+    command: postgres -cshared_preload_libraries=pg_stat_statements -cmax_connections=200 -clog_destination=stderr
+
+  # Graph Node for subgraph indexing
+  graph-node:
+    image: graphprotocol/graph-node:latest
+    depends_on:
+      - rpc-proxy
+      - graph-postgres
+      - ipfs
+    environment:
+      - postgres_host=graph-postgres
+      - postgres_user=graph-node
+      - postgres_pass=let-me-in
+      - postgres_db=graph-node
+      - ipfs=ipfs:5001
+      - ethereum=sepolia:http://rpc-proxy:${SERVER_PORT:-8888}/rpc
+      - RUST_LOG=info
+      - GRAPH_LOG=info
+    ports:
+      - "8000:8000"   # GraphQL HTTP server
+      - "8001:8001"   # GraphQL WebSocket server  
+      - "8020:8020"   # JSON-RPC admin server
+      - "8030:8030"   # Index node server
+      - "8040:8040"   # Metrics server
+
+volumes:
+  postgres_data:
+  graph_postgres_data:
+  ipfs_data:
