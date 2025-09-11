@@ -9,8 +9,12 @@ services:
       # Server Configuration
       - SERVER_PORT=8888
       
-      # ไม่ใช้ database
-      - DB_HOST=none
+      # ปิดการใช้ database โดยตั้ง DB_HOST เป็น empty string
+      - DB_HOST=
+      - DB_PORT=
+      - DB_USER=
+      - DB_PASSWORD=
+      - DB_NAME=
       
       # Ethereum Mainnet
       - ETHEREUM_RPC_ENDPOINTS=https://eth.llamarpc.com,https://ethereum.publicnode.com,https://rpc.ankr.com/eth
@@ -19,7 +23,7 @@ services:
       - SEPOLIA_RPC_ENDPOINTS=https://sepolia.drpc.org,https://ethereum-sepolia-rpc.publicnode.com,https://rpc.ankr.com/eth_sepolia
       
       # Soneium Mainnet
-      - SONEIUM_RPC_ENDPOINTS=https://soneium.drpc.org,https://rpc.soneium.org,https://soneium-mainnet.public.blastapi.io
+      - SONEIUM_RPC_ENDPOINTS=https://soneium.drpc.org,https://rpc.soneium.org
       
       # เพิ่ม Chain อื่นๆ ตามต้องการ
       # - POLYGON_RPC_ENDPOINTS=https://polygon-rpc.com,https://rpc-mainnet.matic.network

@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"rpc-proxy/internal/database"
+	"rpc-proxy/internal/health"
 	"rpc-proxy/internal/repository/gorm"
 	"rpc-proxy/internal/types"
-	"rpc-proxy/internal/health"
 
 	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
@@ -21,12 +21,12 @@ type Config struct {
 	HealthCheck health.HealthCheckConfig
 	Proxy       ProxyConfig
 	App         AppConfig
-	
+
 	// Multi-chain runtime fields loaded from database
-	Chains          []*types.Chain
-	ChainEndpoints  map[string][]*types.RPCEndpoint // chainName -> endpoints
-	ChainConfigs    map[string]map[string]string    // chainName -> configKey -> configValue
-	
+	Chains         []*types.Chain
+	ChainEndpoints map[string][]*types.RPCEndpoint // chainName -> endpoints
+	ChainConfigs   map[string]map[string]string    // chainName -> configKey -> configValue
+
 	// Legacy single-chain support (deprecated)
 	RPCEndpoints []*types.RPCEndpoint
 }
@@ -44,15 +44,14 @@ type DatabaseConfig struct {
 	SSLMode  string
 }
 
-
 type ProxyConfig struct {
 	Timeout        time.Duration
 	MaxConnections int
 }
 
 type AppConfig struct {
-	Environment string
-	LogLevel    string
+	Environment          string
+	LogLevel             string
 	FallbackRPCEndpoints []string
 }
 
@@ -91,8 +90,8 @@ func Load() (*Config, error) {
 			MaxConnections: viper.GetInt("proxy.max_connections"),
 		},
 		App: AppConfig{
-			Environment: viper.GetString("app.env"),
-			LogLevel:    viper.GetString("log.level"),
+			Environment:          viper.GetString("app.env"),
+			LogLevel:             viper.GetString("log.level"),
 			FallbackRPCEndpoints: viper.GetStringSlice("fallback.rpc_endpoints"),
 		},
 	}
@@ -104,7 +103,7 @@ func Load() (*Config, error) {
 			// Use fallback configuration
 			config = createFallbackMultiChainConfig(config)
 		}
-		
+
 		// Load and override settings from database
 		if err := loadSettingsFromDB(config); err != nil {
 			log.Printf("Warning: Failed to load settings from database: %v", err)
@@ -125,8 +124,8 @@ func setDefaults() {
 	// Server defaults
 	viper.SetDefault("server.port", 8888)
 
-	// Database defaults
-	viper.SetDefault("db.host", "localhost")
+	// Database defaults - set empty to disable DB by default
+	viper.SetDefault("db.host", "")
 	viper.SetDefault("db.port", 5432)
 	viper.SetDefault("db.user", "postgres")
 	viper.SetDefault("db.password", "")
@@ -293,7 +292,7 @@ func loadMultiChainConfigFromDB(config *Config) error {
 	// Load endpoints for each chain
 	endpointRepo := gorm.NewRPCEndpointRepository(db)
 	chainConfigRepo := gorm.NewChainConfigRepository(db)
-	
+
 	for _, chain := range chains {
 		// Load endpoints for this chain
 		endpoints, err := endpointRepo.GetAllByChain(chain.Name)
@@ -303,7 +302,7 @@ func loadMultiChainConfigFromDB(config *Config) error {
 		} else {
 			config.ChainEndpoints[chain.Name] = endpoints
 		}
-		
+
 		// Load chain-specific config
 		chainConfigs, err := chainConfigRepo.GetByChainName(chain.Name)
 		if err != nil {
@@ -322,8 +321,8 @@ func loadMultiChainConfigFromDB(config *Config) error {
 	} else {
 		config.RPCEndpoints = legacyEndpoints
 	}
-	
-	log.Printf("Multi-chain configuration loaded: %d chains, %d total endpoints", 
+
+	log.Printf("Multi-chain configuration loaded: %d chains, %d total endpoints",
 		len(config.Chains), len(config.RPCEndpoints))
 
 	return nil
@@ -357,6 +356,18 @@ func createFallbackMultiChainConfig(config *Config) *Config {
 			NativeCurrencyDecimals: 18,
 			BlockExplorerURL:       "https://sepolia.etherscan.io",
 		},
+		{
+			ID:                     3,
+			ChainID:                1868,
+			Name:                   "soneium",
+			DisplayName:            "Soneium Mainnet",
+			RPCPath:                "soneium",
+			IsTestnet:              false,
+			IsEnabled:              true,
+			NativeCurrencySymbol:   "ETH",
+			NativeCurrencyDecimals: 18,
+			BlockExplorerURL:       "https://explorer.soneium.org",
+		},
 	}
 
 	// Create fallback endpoints
@@ -371,6 +382,10 @@ func createFallbackMultiChainConfig(config *Config) *Config {
 			{ID: 5, Name: "Sepolia-PublicNode", URL: "https://ethereum-sepolia-rpc.publicnode.com", Weight: 2, Enabled: true, ChainID: 2},
 			{ID: 6, Name: "Sepolia-DRPC", URL: "https://sepolia.drpc.org", Weight: 2, Enabled: true, ChainID: 2},
 		},
+		"soneium": {
+			{ID: 7, Name: "Soneium-DRPC", URL: "https://soneium.drpc.org", Weight: 3, Enabled: true, ChainID: 3},
+			{ID: 8, Name: "Soneium-Official", URL: "https://rpc.soneium.org", Weight: 2, Enabled: true, ChainID: 3},
+		},
 	}
 
 	// Create fallback chain configs
@@ -382,6 +397,10 @@ func createFallbackMultiChainConfig(config *Config) *Config {
 		"sepolia": {
 			"max_block_lag":            "10",
 			"gas_price_gwei_threshold": "20",
+		},
+		"soneium": {
+			"max_block_lag":            "5",
+			"gas_price_gwei_threshold": "50",
 		},
 	}
 
@@ -409,24 +428,24 @@ func createFallbackEndpoints(urls []string) []*types.RPCEndpoint {
 // CreateMultiChainHealthChecker creates a multi-chain health checker from config
 func (c *Config) CreateMultiChainHealthChecker() *health.MultiChainChecker {
 	chainsConfig := make(map[string]*health.ChainConfig)
-	
+
 	for _, chain := range c.Chains {
 		if !chain.IsEnabled {
 			continue
 		}
-		
+
 		endpoints, exists := c.ChainEndpoints[chain.Name]
 		if !exists || len(endpoints) == 0 {
 			log.Printf("Warning: No endpoints configured for chain %s, skipping", chain.Name)
 			continue
 		}
-		
+
 		chainsConfig[chain.Name] = &health.ChainConfig{
 			Chain:     chain,
 			Endpoints: endpoints,
 		}
 	}
-	
+
 	return health.NewMultiChainChecker(chainsConfig, c.HealthCheck)
 }
 
