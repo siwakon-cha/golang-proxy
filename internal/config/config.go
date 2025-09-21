@@ -368,6 +368,18 @@ func createFallbackMultiChainConfig(config *Config) *Config {
 			NativeCurrencyDecimals: 18,
 			BlockExplorerURL:       "https://explorer.soneium.org",
 		},
+		{
+			ID:                     4,
+			ChainID:                1946,
+			Name:                   "soneium-testnet",
+			DisplayName:            "Soneium Testnet",
+			RPCPath:                "soneium-testnet",
+			IsTestnet:              true,
+			IsEnabled:              true,
+			NativeCurrencySymbol:   "ETH",
+			NativeCurrencyDecimals: 18,
+			BlockExplorerURL:       "https://explorer-testnet.soneium.org",
+		},
 	}
 
 	// Create fallback endpoints
@@ -386,6 +398,10 @@ func createFallbackMultiChainConfig(config *Config) *Config {
 			{ID: 7, Name: "Soneium-DRPC", URL: "https://soneium.drpc.org", Weight: 3, Enabled: true, ChainID: 3},
 			{ID: 8, Name: "Soneium-Official", URL: "https://rpc.soneium.org", Weight: 2, Enabled: true, ChainID: 3},
 		},
+		"soneium-testnet": {
+			{ID: 9, Name: "Soneium-Testnet-Official", URL: "https://rpc.minato.soneium.org", Weight: 3, Enabled: true, ChainID: 4},
+			{ID: 10, Name: "Soneium-Testnet-DRPC", URL: "https://soneium-minato.drpc.org", Weight: 2, Enabled: true, ChainID: 4},
+		},
 	}
 
 	// Create fallback chain configs
@@ -401,6 +417,10 @@ func createFallbackMultiChainConfig(config *Config) *Config {
 		"soneium": {
 			"max_block_lag":            "5",
 			"gas_price_gwei_threshold": "50",
+		},
+		"soneium-testnet": {
+			"max_block_lag":            "10",
+			"gas_price_gwei_threshold": "20",
 		},
 	}
 

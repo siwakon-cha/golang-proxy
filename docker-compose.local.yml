@@ -24,7 +24,10 @@ services:
       
       # Soneium Mainnet
       - SONEIUM_RPC_ENDPOINTS=https://soneium.drpc.org,https://rpc.soneium.org
-      
+
+      # Soneium Testnet
+      - SONEIUM_TESTNET_RPC_ENDPOINTS=https://rpc.minato.soneium.org,https://soneium-minato.drpc.org
+
       # เพิ่ม Chain อื่นๆ ตามต้องการ
       # - POLYGON_RPC_ENDPOINTS=https://polygon-rpc.com,https://rpc-mainnet.matic.network
       # - ARBITRUM_RPC_ENDPOINTS=https://arb1.arbitrum.io/rpc
