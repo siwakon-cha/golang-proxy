@@ -17,10 +17,10 @@ services:
       - DB_NAME=
       
       # Ethereum Mainnet
-      - ETHEREUM_RPC_ENDPOINTS=https://eth.llamarpc.com,https://ethereum.publicnode.com,https://rpc.ankr.com/eth
+      - ETHEREUM_RPC_ENDPOINTS=https://go.getblock.io/6c32879fe8f8482893ac38bfa534dbc4,https://eth.llamarpc.com,https://ethereum.publicnode.com
       
       # Sepolia Testnet  
-      - SEPOLIA_RPC_ENDPOINTS=https://sepolia.drpc.org,https://ethereum-sepolia-rpc.publicnode.com,https://rpc.ankr.com/eth_sepolia
+      - SEPOLIA_RPC_ENDPOINTS=https://go.getblock.io/dfb8008d3f1347ce81d0500c8bc669ea,https://sepolia.drpc.org,https://ethereum-sepolia-rpc.publicnode.com
       
       # Soneium Mainnet
       - SONEIUM_RPC_ENDPOINTS=https://soneium.drpc.org,https://rpc.soneium.org
