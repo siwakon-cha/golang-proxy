@@ -19,19 +19,19 @@ import (
 )
 
 type Server struct {
-	config         *config.Config
+	config                  *config.Config
 	multiChainHealthChecker *health.MultiChainChecker
-	client         *http.Client
-	mu             sync.RWMutex
-	chainPathRegex *regexp.Regexp
+	client                  *http.Client
+	mu                      sync.RWMutex
+	chainPathRegex          *regexp.Regexp
 }
 
 func NewServer(cfg *config.Config, multiChainHealthChecker *health.MultiChainChecker) *Server {
 	// Compile regex for chain path matching: /rpc/{chain}
-	chainPathRegex := regexp.MustCompile(`^/rpc/([a-zA-Z0-9]+)/?$`)
-	
+	chainPathRegex := regexp.MustCompile(`^/rpc/([a-zA-Z0-9-]+)/?$`)
+
 	return &Server{
-		config:         cfg,
+		config:                  cfg,
 		multiChainHealthChecker: multiChainHealthChecker,
 		client: &http.Client{
 			Timeout: cfg.Proxy.Timeout,
@@ -42,16 +42,16 @@ func NewServer(cfg *config.Config, multiChainHealthChecker *health.MultiChainChe
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	
+
 	// Multi-chain health endpoint
 	mux.HandleFunc("/health", s.handleMultiChainHealth)
-	
+
 	// Chain-specific health endpoints
 	mux.HandleFunc("/health/", s.handleChainHealth)
-	
+
 	// Multi-chain RPC endpoints
 	mux.HandleFunc("/rpc/", s.handleMultiChainRPC)
-	
+
 	// Legacy single-chain RPC endpoint (defaults to ethereum)
 	mux.HandleFunc("/rpc", s.handleLegacyRPC)
 	mux.HandleFunc("/", s.handleLegacyRPC)
@@ -153,7 +153,7 @@ func (s *Server) handleLegacyRPC(w http.ResponseWriter, r *http.Request) {
 // handleRPCForChain processes RPC requests for a specific chain
 func (s *Server) handleRPCForChain(w http.ResponseWriter, r *http.Request, chainName string) {
 	// Log incoming request details for debugging
-	log.Printf("Incoming request: Method=%s, ContentType=%s, ContentLength=%d, URL=%s, Chain=%s", 
+	log.Printf("Incoming request: Method=%s, ContentType=%s, ContentLength=%d, URL=%s, Chain=%s",
 		r.Method, r.Header.Get("Content-Type"), r.ContentLength, r.URL.Path, chainName)
 
 	if r.Method != "POST" && r.Method != "GET" {
@@ -166,7 +166,7 @@ func (s *Server) handleRPCForChain(w http.ResponseWriter, r *http.Request, chain
 	if r.Method == "POST" {
 		contentType := r.Header.Get("Content-Type")
 		log.Printf("POST request with Content-Type: %s", contentType)
-		
+
 		// Log request body for debugging
 		if r.ContentLength > 0 && r.ContentLength < 1000 {
 			bodyBytes, _ := io.ReadAll(r.Body)
@@ -199,7 +199,7 @@ func (s *Server) handleRPCForChain(w http.ResponseWriter, r *http.Request, chain
 	// Sort endpoints by weight (highest first) for failover
 	sortedEndpoints := s.getSortedEndpointsByWeight(healthyEndpoints)
 	var lastErr error
-	
+
 	// Try each endpoint by weight priority
 	for i, endpoint := range sortedEndpoints {
 		resp, err := s.forwardRequest(r.Context(), endpoint, body, r.Header)
@@ -211,7 +211,7 @@ func (s *Server) handleRPCForChain(w http.ResponseWriter, r *http.Request, chain
 
 		s.copyResponse(w, resp)
 		resp.Body.Close()
-		
+
 		duration := time.Since(start)
 		log.Printf("Request forwarded to %s (chain: %s, weight: %d) completed in %v", endpoint.URL, chainName, endpoint.Weight, duration)
 		return
@@ -246,7 +246,7 @@ func (s *Server) getSortedEndpointsByWeight(endpoints []*types.RPCEndpoint) []*t
 	// Sort endpoints by weight (highest first)
 	sortedEndpoints := make([]*types.RPCEndpoint, len(endpoints))
 	copy(sortedEndpoints, endpoints)
-	
+
 	// Simple bubble sort by weight (descending)
 	for i := 0; i < len(sortedEndpoints)-1; i++ {
 		for j := 0; j < len(sortedEndpoints)-i-1; j++ {
@@ -277,7 +277,7 @@ func (s *Server) forwardRequest(ctx context.Context, endpoint *types.RPCEndpoint
 
 	// Always ensure Content-Type is application/json for RPC requests
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	log.Printf("Forwarding request to %s with Content-Type: %s", endpoint.URL, req.Header.Get("Content-Type"))
 
 	resp, err := s.client.Do(req)
@@ -295,7 +295,7 @@ func (s *Server) copyResponse(w http.ResponseWriter, resp *http.Response) {
 			w.Header().Add(key, value)
 		}
 	}
-	
+
 	w.WriteHeader(resp.StatusCode)
 	io.Copy(w, resp.Body)
 }
